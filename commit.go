@@ -58,11 +58,11 @@ func (c *Commit) TreeId() sha1 {
 	return c.Tree.Id
 }
 
-func (c *Commit) CommitsBefore() (*list.List, error) {
+func (c *Commit) CommitsBefore() ([]*Commit, error) {
 	return c.repo.getCommitsBefore(c.Id)
 }
 
-func (c *Commit) CommitsBeforeUntil(commitId string) (*list.List, error) {
+func (c *Commit) CommitsBeforeUntil(commitId string) ([]*Commit, error) {
 	ec, err := c.repo.GetCommit(commitId)
 	if err != nil {
 		return nil, err

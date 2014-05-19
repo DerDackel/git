@@ -8,7 +8,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"sync"
+	"log"
+//	"sync"
 
 	"github.com/Unknwon/com"
 )
@@ -126,8 +127,9 @@ func (repo *Repository) commitsCount(id sha1) (int, error) {
 }
 
 // used only for single tree, (]
-func (repo *Repository) CommitsBetween(last *Commit, before *Commit) (*list.List, error) {
-	l := list.New()
+func (repo *Repository) CommitsBetween(last *Commit, before *Commit) ([]*Commit, error) {
+	//l := list.New()
+	l := []*Commit{}
 	if last == nil || last.ParentCount() == 0 {
 		return l, nil
 	}
@@ -138,7 +140,7 @@ func (repo *Repository) CommitsBetween(last *Commit, before *Commit) (*list.List
 		if cur.Id.Equal(before.Id) {
 			break
 		}
-		l.PushBack(cur)
+		l = append(l, cur)
 		if cur.ParentCount() == 0 {
 			break
 		}
@@ -150,7 +152,7 @@ func (repo *Repository) CommitsBetween(last *Commit, before *Commit) (*list.List
 	return l, nil
 }
 
-func (repo *Repository) CommitsBefore(commitId string) (*list.List, error) {
+func (repo *Repository) CommitsBefore(commitId string) ([]*Commit, error) {
 	id, err := NewIdFromString(commitId)
 	if err != nil {
 		return nil, err
@@ -159,14 +161,18 @@ func (repo *Repository) CommitsBefore(commitId string) (*list.List, error) {
 	return repo.getCommitsBefore(id)
 }
 
-func (repo *Repository) getCommitsBefore(id sha1) (*list.List, error) {
-	l := list.New()
-	lock := new(sync.Mutex)
-	err := repo.commitsBefore(lock, l, nil, id, 0)
-	return l, err
+func (repo *Repository) getCommitsBefore(id sha1) ([]*Commit, error) {
+	//l := list.New()
+	//lock := new(sync.Mutex)
+	//err := repo.commitsBefore(lock, l, nil, id, 0)
+	commit, err := repo.getCommit(id)
+	if err != nil {
+		return nil, err
+	}
+	return repo.walkCommitDAG(commit)
 }
 
-func (repo *Repository) commitsBefore(lock *sync.Mutex, l *list.List, parent *list.Element, id sha1, limit int) error {
+/*func (repo *Repository) commitsBefore(lock *sync.Mutex, l *list.List, parent *list.Element, id sha1, limit int) error {
 	commit, err := repo.getCommit(id)
 	if err != nil {
 		return err
@@ -221,7 +227,7 @@ func (repo *Repository) commitsBefore(lock *sync.Mutex, l *list.List, parent *li
 	}
 
 	return nil
-}
+}*/
 
 // SearchCommits searches commits in given commitId and keyword of repository.
 func (repo *Repository) SearchCommits(commitId, keyword string) (*list.List, error) {
@@ -292,4 +298,34 @@ func (repo *Repository) getCommitOfRelPath(id sha1, relPath string) (*Commit, er
 	}
 
 	return repo.getCommit(id)
+}
+
+/*func (repo *Repository) GetCommitsOfTree(tree *Tree) (map[string] sha1, error) {
+	result := map[string]sha1{}
+	for _, commit := range repo.walkCommitDAG() {
+
+	}
+}*/
+
+func (repo *Repository) walkCommitDAG(base *Commit) ([]*Commit, error) {
+	log.Printf("Walkingfrom commit %v\n", base)
+	seen := map[*Commit]bool{}
+	all := []*Commit{}
+	var walkFunc func(*Commit)
+	walkFunc = func(c *Commit) {
+		if seen[c] {
+			return
+		}
+		seen[c] = true
+		for i := 0; i < c.ParentCount(); i++ {
+			parent, err := c.Parent(i)
+			if err != nil {
+				return
+			}
+			walkFunc(parent)
+		}
+		all = append(all, c)
+	}
+	walkFunc(base)
+	return all, nil
 }
